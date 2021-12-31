@@ -1080,7 +1080,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "smplinfo-gui"
+name = "smplinfo-widgets-fork"
 version = "0.1.0"
 dependencies = [
  "eframe",
