@@ -1,6 +1,7 @@
 use std::{fmt::Display, hash::Hash};
 
 use eframe::egui::{vec2, Id, Key, Response, ScrollArea, Sense, TextStyle, Ui, Vec2, Widget};
+use serde::{Serialize, Deserialize};
 
 const DEFAULT_COLUMN_WIDTH: f32 = 200.0;
 
@@ -70,6 +71,12 @@ impl<'s, R, C: AsRef<[R]>> Table<'s, R, C> {
         self
     }
 
+    pub fn set_row_height(mut self, height: f32) -> Self {
+      self.row_height = height;
+
+      self
+    }
+
     fn supports_selection(&self) -> bool {
         self.selected_row.is_some()
     }
@@ -96,7 +103,7 @@ impl<'s, R, C: AsRef<[R]>> Table<'s, R, C> {
             let desired_column_width = state.column_width(i);
             let galley = ui
                 .fonts()
-                .layout_single_line(header_text_style, column.name.clone());
+                .layout_no_wrap(column.name.clone(), header_text_style, ui.visuals().text_color());
 
             let mut column_rect = rect;
             column_rect.min.x += column_offset;
@@ -117,15 +124,10 @@ impl<'s, R, C: AsRef<[R]>> Table<'s, R, C> {
 
             let mut text_pos = column_rect.left_center();
             text_pos.x += self.cell_padding.x;
-            text_pos.y -= galley.size.y / 2.0;
+            text_pos.y -= galley.size().y / 2.0;
             ui.painter_at(column_rect).galley(
                 text_pos,
                 galley,
-                if response.hovered() {
-                    ui.style().visuals.widgets.hovered.fg_stroke.color
-                } else {
-                    ui.style().visuals.widgets.inactive.fg_stroke.color
-                },
             );
 
             column_offset += column_rect.width();
@@ -141,21 +143,21 @@ impl<'s, R, C: AsRef<[R]>> Widget for Table<'s, R, C> {
 
         let mut state = ui
             .memory()
-            .id_data_temp
-            .get_or_default::<State>(self.id_source)
+            .data
+            .get_persisted_mut_or_default::<State>(self.id_source)
             .clone();
 
         // First step: compute some sizes used during rendering. Since this is a
         // homogenous table, we can figure out its exact sizes based on the
         // number of rows and columns.
-        let table_rect = ui.available_rect_before_wrap_finite();
+        let table_rect = ui.available_rect_before_wrap();
         let response = ui.interact(table_rect, self.id_source, Sense::hover());
 
         self.header_ui(ui, &mut state);
 
         // Now render the table body, which is inside an independently
         // scrollable area.
-        ScrollArea::auto_sized().show(ui, |ui| {
+        ScrollArea::both().show(ui, |ui| {
             ui.scope(|ui| {
                 // When laying out the table, don't allocate any spacing between the
                 // rows.
@@ -205,12 +207,12 @@ impl<'s, R, C: AsRef<[R]>> Widget for Table<'s, R, C> {
 
                         let painter = ui.painter_at(column_rect);
 
-                        let galley = ui.fonts().layout_single_line(cell_text_style, cell_text);
+                        let galley = ui.fonts().layout(cell_text, cell_text_style, cell_text_color, desired_column_width);
 
                         let mut text_pos = column_rect.left_center();
                         text_pos.x += self.cell_padding.x;
-                        text_pos.y -= galley.size.y / 2.0;
-                        painter.galley(text_pos, galley, cell_text_color);
+                        text_pos.y -= galley.size().y / 2.0;
+                        painter.galley(text_pos, galley);
 
                         column_offset += column_rect.width();
                     }
@@ -218,7 +220,6 @@ impl<'s, R, C: AsRef<[R]>> Widget for Table<'s, R, C> {
                     // INTERACTION
                     if let Some(selected_row) = self.selected_row.as_mut() {
                         if row_response.clicked() {
-                            log::debug!("row clicked: {}", row_idx);
                             **selected_row = Some(row_idx);
                         }
                     }
@@ -251,7 +252,6 @@ impl<'s, R, C: AsRef<[R]>> Widget for Table<'s, R, C> {
             // TODO: How to have the whole table capture focus for keyboard
             // navigation?
             response.request_focus();
-            log::debug!("table clicked");
         }
 
         response
@@ -259,7 +259,7 @@ impl<'s, R, C: AsRef<[R]>> Widget for Table<'s, R, C> {
 }
 
 /// Persistent table UI state.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct State {
     /// Current width of each column. This is updated when a column is resized.
     column_widths: Vec<f32>,

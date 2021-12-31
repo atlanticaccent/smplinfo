@@ -4,6 +4,6 @@
 //! Maybe one day widgets such as these would be included upstream?
 
 mod table;
-mod tree;
+// mod tree;
 
-pub use self::{table::Table, tree::TreeView};
+pub use self::{table::Table, /* tree::TreeView */};
