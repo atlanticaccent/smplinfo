@@ -1,4 +1,4 @@
-use std::{fmt::Display, hash::Hash};
+use std::{fmt::Display, hash::Hash, any::Any};
 
 use eframe::egui::{vec2, Id, Key, Response, ScrollArea, Sense, TextStyle, Ui, Vec2, Widget};
 use serde::{Serialize, Deserialize};
@@ -23,7 +23,7 @@ pub struct Table<'selection, R, C: AsRef<[R]>> {
 /// Table column definition.
 struct Column<R> {
     name: String,
-    value_mapper: Box<dyn FnMut(&R) -> String>,
+    value_mapper: Box<dyn FnMut(&R, &mut eframe::egui::Ui)>,
     max_width: Option<f32>,
 }
 
@@ -61,7 +61,7 @@ impl<'s, R, C: AsRef<[R]>> Table<'s, R, C> {
     pub fn column(
         mut self,
         name: impl Display,
-        value_mapper: impl FnMut(&R) -> String + 'static,
+        value_mapper: impl FnMut(&R, &mut eframe::egui::Ui) + 'static,
     ) -> Self {
         self.columns.push(Column {
             name: name.to_string(),
@@ -196,7 +196,7 @@ impl<'s, R, C: AsRef<[R]>> Widget for Table<'s, R, C> {
 
                     for (col_idx, column) in self.columns.iter_mut().enumerate() {
                         let desired_column_width = state.column_width(col_idx);
-                        let cell_text = (column.value_mapper)(row);
+                        // let widget = (column.value_mapper)(row);
 
                         let mut column_rect = row_rect;
                         column_rect.min.x += column_offset;
@@ -205,14 +205,21 @@ impl<'s, R, C: AsRef<[R]>> Widget for Table<'s, R, C> {
                             column_rect.set_width(desired_column_width);
                         }
 
-                        let painter = ui.painter_at(column_rect);
+                        // let painter = ui.painter_at(column_rect);
 
-                        let galley = ui.fonts().layout(cell_text, cell_text_style, cell_text_color, desired_column_width);
+                        // let galley = ui.fonts().layout(cell_text, cell_text_style, cell_text_color, desired_column_width);
 
-                        let mut text_pos = column_rect.left_center();
-                        text_pos.x += self.cell_padding.x;
-                        text_pos.y -= galley.size().y / 2.0;
-                        painter.galley(text_pos, galley);
+                        // let mut text_pos = column_rect.left_center();
+                        // text_pos.x += self.cell_padding.x;
+                        // text_pos.y -= galley.size().y / 2.0;
+                        // painter.galley(text_pos, galley);
+                        ui.allocate_ui_at_rect(column_rect, |ui| {
+                            if ui.is_rect_visible(column_rect) {
+                                ui.set_clip_rect(column_rect.intersect(ui.clip_rect()));
+                            }
+                            ui.set_height(column_rect.height());
+                            (column.value_mapper)(row, ui);
+                        });
 
                         column_offset += column_rect.width();
                     }
