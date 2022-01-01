@@ -213,9 +213,12 @@ impl<'s, R, C: AsRef<[R]>> Widget for Table<'s, R, C> {
                         // text_pos.x += self.cell_padding.x;
                         // text_pos.y -= galley.size().y / 2.0;
                         // painter.galley(text_pos, galley);
-                        ui.allocate_rect(column_rect, eframe::egui::Sense::click());
                         ui.allocate_ui_at_rect(column_rect, |ui| {
-                            (column.value_mapper)(row, ui)
+                            if ui.is_rect_visible(column_rect) {
+                                ui.set_clip_rect(column_rect.intersect(ui.clip_rect()));
+                            }
+                            ui.set_height(column_rect.height());
+                            (column.value_mapper)(row, ui);
                         });
 
                         column_offset += column_rect.width();
