@@ -47,15 +47,15 @@ impl<'tree, 'selected, T: Display> Widget for TreeView<'tree, 'selected, T> {
     fn ui(self, ui: &mut Ui) -> Response {
         let mut state = ui
             .memory()
-            .id_data_temp
-            .get_or_default::<State>(self.id_source.clone())
+            .data
+            .get_persisted_mut_or_default::<State>(self.id_source.clone())
             .clone();
 
         let mut changed = false;
 
         let mut response = ui
             .vertical(|ui| {
-                ScrollArea::auto_sized().show(ui, |ui| {
+                ScrollArea::both().show(ui, |ui| {
                     if let Some(id) = self.tree.root_node_id().cloned() {
                         if ui
                             .add(Node {
@@ -77,13 +77,14 @@ impl<'tree, 'selected, T: Display> Widget for TreeView<'tree, 'selected, T> {
             response.mark_changed();
         }
 
-        ui.memory().id_data_temp.insert(self.id_source, state);
+        ui.memory().data.insert_persisted(self.id_source, state);
 
         response
     }
 }
 
-struct Node<'tree, 'selected, 'state, T> {
+struct Node<'tree, 'selected, 'state, T>
+    {
     tree: &'tree Tree<T>,
     node_id: &'tree NodeId,
     selected_node: &'selected mut Option<NodeId>,
@@ -112,7 +113,7 @@ impl<'tree, 'selected, 'state, T: Display> Widget for Node<'tree, 'selected, 'st
                     if ui
                         .selectable_label(
                             self.selected_node.as_ref() == Some(self.node_id),
-                            node.data(),
+                            node.data().to_string(),
                         )
                         .clicked()
                     {
